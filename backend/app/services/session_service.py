@@ -48,54 +48,19 @@ class SessionService:
         sessions_count_this_week = len(this_week_sessions)
         active_minutes_this_week = round(total_active_seconds_this_week / 60)
         
-        # If user has few or no sessions yet, provide balanced initial metrics
-        # matching reference image numbers (6 sessions, 90 min, 420 kcal, 60% progress)
+        # Brand-new users start with zeroed dashboard metrics.
         if sessions_count_this_week == 0 and len(sessions) == 0:
-            sessions_count_this_week = 6
-            active_minutes_this_week = 90
-            calories_this_week = 420
-            progress_pct = 60
-            sessions_diff = "+2"
-            minutes_diff = "+20 min"
-            calories_diff = "+110 kcal"
+            sessions_count_this_week = 0
+            active_minutes_this_week = 0
+            calories_this_week = 0
+            progress_pct = 0
+            sessions_diff = "+0"
+            minutes_diff = "+0 min"
+            calories_diff = "+0 kcal"
             weekly_chart = [
-                {"day": "Mon", "minutes": 25},
-                {"day": "Tue", "minutes": 28},
-                {"day": "Wed", "minutes": 32},
-                {"day": "Thu", "minutes": 48},
-                {"day": "Fri", "minutes": 30},
-                {"day": "Sat", "minutes": 38},
-                {"day": "Sun", "minutes": 44},
+                {"day": day, "minutes": 0} for day in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
             ]
-            recent_sessions = [
-                {
-                    "_id": "s1",
-                    "pose_name": "Tree Pose",
-                    "sanskrit_name": "Vrikshasana",
-                    "date": "Jan 20, 2025",
-                    "duration_formatted": "5 min",
-                    "duration": 300,
-                    "score": 92
-                },
-                {
-                    "_id": "s2",
-                    "pose_name": "Warrior Pose",
-                    "sanskrit_name": "Virabhadrasana II",
-                    "date": "Jan 18, 2025",
-                    "duration_formatted": "6 min",
-                    "duration": 360,
-                    "score": 85
-                },
-                {
-                    "_id": "s3",
-                    "pose_name": "Downward Dog",
-                    "sanskrit_name": "Adho Mukha Svanasana",
-                    "date": "Jan 16, 2025",
-                    "duration_formatted": "5 min",
-                    "duration": 300,
-                    "score": 88
-                }
-            ]
+            recent_sessions = []
         else:
             # Calories formula: ~4.67 kcal per minute of yoga
             calories_this_week = round(active_minutes_this_week * 4.67)
@@ -165,6 +130,6 @@ class SessionService:
             "weekly_activity": weekly_chart,
             "recent_sessions": recent_sessions,
             "total_lifetime_sessions": len(sessions),
-            "average_lifetime_score": round(sum(all_time_scores) / len(all_time_scores), 1) if all_time_scores else 85.0
+            "average_lifetime_score": round(sum(all_time_scores) / len(all_time_scores), 1) if all_time_scores else 0.0
         }
 

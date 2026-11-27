@@ -1,29 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Target } from 'lucide-react';
 
 export default function WeeklyGoalCard({
-  currentMinutes = 90,
+  currentMinutes = 0,
   targetMinutes = 150,
-  percentage = 60
+  percentage = 0
 }) {
-  const [completedCount, setCompletedCount] = useState(0);
-  const [posePercentage, setPosePercentage] = useState(percentage);
-
-  useEffect(() => {
-    const dailyData = JSON.parse(localStorage.getItem('fitverse_daily_data') || '{}');
-    const today = new Date().toISOString().split('T')[0];
-    const todayData = dailyData[today] || {};
-    
-    const completedPoses = todayData.completedPoses || {};
-    const count = Object.values(completedPoses).filter(Boolean).length;
-    setCompletedCount(count);
-    
-    // Calculate percentage based on 3 poses
-    const pct = Math.round((count / 3) * 100);
-    setPosePercentage(pct);
-  }, []);
-
-  const safePercentage = Math.min(100, Math.max(0, posePercentage));
+  const safePercentage = Math.min(100, Math.max(0, percentage));
+  const safeCurrent = Math.max(0, currentMinutes || 0);
+  const safeTarget = Math.max(1, targetMinutes || 150);
+  const remaining = Math.max(0, safeTarget - safeCurrent);
 
   return (
     <div className="bg-white rounded-3xl border border-[#F0E6F7] p-6 shadow-card flex flex-col justify-between">
@@ -34,8 +20,8 @@ export default function WeeklyGoalCard({
             <Target className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-bold text-base text-fitverse-dark">Daily Pose Goal</h3>
-            <p className="text-xs text-fitverse-muted">Complete 3 yoga poses</p>
+            <h3 className="font-bold text-base text-fitverse-dark">Weekly Yoga Goal</h3>
+            <p className="text-xs text-fitverse-muted">Reach your weekly practice target</p>
           </div>
         </div>
 
@@ -53,13 +39,13 @@ export default function WeeklyGoalCard({
         </div>
       </div>
 
-      {/* Footer Pose Status */}
+      {/* Footer Goal Status */}
       <div className="mt-4 pt-2 border-t border-gray-50 flex items-center justify-between text-xs font-semibold text-fitverse-muted">
         <span>
-          <strong className="text-fitverse-dark text-sm">{completedCount}</strong> / 3 poses completed
+          <strong className="text-fitverse-dark text-sm">{safeCurrent}</strong> / {safeTarget} min completed
         </span>
+        <span>{remaining} min left</span>
       </div>
     </div>
   );
 }
-

@@ -4,11 +4,32 @@ import { X, CheckCircle2, Circle } from 'lucide-react';
 const POSE_CALORIES = {
   "warrior_ii": 50, // calories per 5 min session
   "tree_pose": 35,
-  "downward_dog": 45
+  "downward_dog": 45,
+  "mountain_pose": 30,
+  "chair_pose": 55,
+  "plank_pose": 60,
+  "cobra_pose": 35,
+  "bridge_pose": 50,
+  "seated_forward_bend": 30,
+  "cat_cow_pose": 35
 };
+
+const PLANNER_POSE_IDS = [
+  "warrior_ii",
+  "tree_pose",
+  "downward_dog",
+  "mountain_pose",
+  "chair_pose",
+  "plank_pose",
+  "cobra_pose",
+  "bridge_pose",
+  "seated_forward_bend",
+  "cat_cow_pose"
+];
 
 export default function PosePlannerModal({ isOpen, onClose, poses, onSelectPose, onStartSession }) {
   const [completedPoses, setCompletedPoses] = useState({});
+  const [completionDates, setCompletionDates] = useState({});
 
   // Load completed poses from localStorage
   useEffect(() => {
@@ -16,36 +37,54 @@ export default function PosePlannerModal({ isOpen, onClose, poses, onSelectPose,
     if (saved) {
       setCompletedPoses(JSON.parse(saved));
     }
+    const savedDates = localStorage.getItem('fitverse_pose_completion_dates');
+    if (savedDates) {
+      setCompletionDates(JSON.parse(savedDates));
+    }
   }, []);
 
   // Save completed poses to localStorage
   const togglePoseCompletion = (poseId) => {
+    const today = new Date().toISOString().split('T')[0];
     const updated = {
       ...completedPoses,
       [poseId]: !completedPoses[poseId]
     };
+    const updatedDates = { ...completionDates };
+    if (updated[poseId]) {
+      updatedDates[poseId] = today;
+    } else {
+      delete updatedDates[poseId];
+    }
+
     setCompletedPoses(updated);
+    setCompletionDates(updatedDates);
     localStorage.setItem('fitverse_completed_poses', JSON.stringify(updated));
-    
-    // Update daily calories in localStorage
-    const today = new Date().toISOString().split('T')[0];
-    const dailyData = JSON.parse(localStorage.getItem('fitverse_daily_data') || '{}');
-    const totalCalories = Object.keys(updated).reduce((sum, id) => {
-      return sum + (updated[id] ? (POSE_CALORIES[id] || 0) : 0);
+    localStorage.setItem('fitverse_pose_completion_dates', JSON.stringify(updatedDates));
+
+    // Store only today's planner calories/completions for daily tracking
+    const dailyCalories = Object.keys(updatedDates).reduce((sum, id) => {
+      return sum + (updatedDates[id] === today ? (POSE_CALORIES[id] || 0) : 0);
     }, 0);
+    const todayCompletedPoses = Object.keys(updated).reduce((acc, id) => {
+      if (updated[id] && updatedDates[id] === today) acc[id] = true;
+      return acc;
+    }, {});
+
+    const dailyData = JSON.parse(localStorage.getItem('fitverse_daily_data') || '{}');
     dailyData[today] = {
       ...dailyData[today],
-      calories: totalCalories,
-      completedPoses: updated
+      calories: dailyCalories,
+      completedPoses: todayCompletedPoses
     };
     localStorage.setItem('fitverse_daily_data', JSON.stringify(dailyData));
   };
 
-  const plannerDays = [
-    { day: 1, poseId: "warrior_ii", label: "Day 1" },
-    { day: 2, poseId: "tree_pose", label: "Day 2" },
-    { day: 3, poseId: "downward_dog", label: "Day 3" }
-  ];
+  const plannerDays = PLANNER_POSE_IDS.map((poseId, index) => ({
+    day: index + 1,
+    poseId,
+    label: `Day ${index + 1}`
+  }));
 
   if (!isOpen) return null;
 
@@ -55,7 +94,7 @@ export default function PosePlannerModal({ isOpen, onClose, poses, onSelectPose,
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 pb-4">
           <div>
-            <h3 className="text-xl font-bold text-fitverse-dark">3-Day Yoga Planner</h3>
+            <h3 className="text-xl font-bold text-fitverse-dark">10-Day Yoga Planner</h3>
             <p className="text-xs text-fitverse-muted">Complete one pose each day and track your progress</p>
           </div>
           <button
@@ -67,7 +106,7 @@ export default function PosePlannerModal({ isOpen, onClose, poses, onSelectPose,
         </div>
 
         {/* Day-wise Planner */}
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[58vh] overflow-y-auto pr-1">
           {plannerDays.map((dayPlan) => {
             const pose = poses.find(p => p.id === dayPlan.poseId);
             const isCompleted = completedPoses[dayPlan.poseId];
@@ -148,7 +187,7 @@ export default function PosePlannerModal({ isOpen, onClose, poses, onSelectPose,
             <div>
               <p className="text-xs font-semibold text-fitverse-muted">Today's Progress</p>
               <p className="text-sm font-bold text-fitverse-dark mt-0.5">
-                {Object.values(completedPoses).filter(Boolean).length} / 3 poses completed
+                {plannerDays.filter((dayPlan) => completedPoses[dayPlan.poseId]).length} / {plannerDays.length} poses completed
               </p>
             </div>
             <div className="text-right">

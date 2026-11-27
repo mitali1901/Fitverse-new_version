@@ -169,13 +169,7 @@ export default function YogaStudio() {
             <div className="flex items-center gap-2">
               <div className="w-14 h-12 rounded-xl bg-fitverse-lavender overflow-hidden border border-purple-100 flex items-center justify-center p-1">
                 <img
-                  src={
-                    selectedPose?.id === "tree_pose"
-                      ? "/assets/tree_pose.svg"
-                      : selectedPose?.id === "downward_dog"
-                      ? "/assets/downward_dog.svg"
-                      : "/assets/warrior_pose.svg"
-                  }
+                  src={selectedPose?.image || "/assets/warrior_pose.svg"}
                   alt={currentPoseName}
                   className="w-full h-full object-contain"
                 />

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useYoga } from '../context/YogaContext';
 import WelcomeBanner from '../components/dashboard/WelcomeBanner';
@@ -11,21 +11,17 @@ import AICoachCard from '../components/dashboard/AICoachCard';
 export default function Dashboard() {
   const { user } = useAuth();
   const { dashboardData, refreshSummary } = useYoga();
-  const [data, setData] = useState(dashboardData);
 
   useEffect(() => {
-    async function load() {
-      const summary = await refreshSummary();
-      if (summary) setData(summary);
-    }
-    load();
-  }, []);
+    refreshSummary();
+  }, [refreshSummary]);
 
+  const data = dashboardData;
   const userName = user?.name ? user.name.split(' ')[0] : 'Yogi';
   const weeklyGoal = data?.weekly_goal || {
     target_minutes: 150,
-    current_minutes: 90,
-    progress_percentage: 60
+    current_minutes: 0,
+    progress_percentage: 0
   };
 
   return (

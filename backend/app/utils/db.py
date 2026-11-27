@@ -178,7 +178,7 @@ class Database:
 
     @classmethod
     def connect(cls):
-        mongo_uri = Config.MONGO_URI.strip()
+        mongo_uri = Config.MONGODB_URI.strip()
         if mongo_uri:
             try:
                 cls.client = MongoClient(mongo_uri, serverSelectionTimeoutMS=3000)
@@ -192,8 +192,8 @@ class Database:
                 cls.db.users.create_index("email", unique=True)
                 cls.db.yoga_sessions.create_index([("user_id", ASCENDING), ("completed_at", DESCENDING)])
                 return cls.db
-            except (ConnectionFailure, ServerSelectionTimeoutError, Exception) as e:
-                print(f"[FitVerse Database Warning] MongoDB Atlas connection failed ({e}). Falling back to local persistent store.")
+            except Exception as e:
+                print(f"[FitVerse Database Warning] MongoDB Atlas connection failed ({type(e).__name__}). Falling back to local persistent store.")
         
         # Fallback to local store
         print("[FitVerse Database] Running in Local Storage Mode (Offline / Dev Fallback). Ready for immediate use!")

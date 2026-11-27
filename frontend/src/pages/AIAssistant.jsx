@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, Trash2, Bot, User, Loader2 } from 'lucide-react';
 import { assistantService } from '../services/assistantService';
 import { useYoga } from '../context/YogaContext';
+import { useAuth } from '../context/AuthContext';
 
 const SUGGESTED_PROMPTS = [
   "How do I correctly align my front knee in Warrior II?",
@@ -14,6 +15,7 @@ const SUGGESTED_PROMPTS = [
 
 export default function AIAssistant() {
   const { selectedPose } = useYoga();
+  const { user } = useAuth();
 
   const [messages, setMessages] = useState([
     {
@@ -50,10 +52,8 @@ export default function AIAssistant() {
 
     try {
       const context = {
-        current_pose: selectedPose?.name || "Warrior II Pose",
-        alignment_score: 78,
-        common_mistakes: ["Front knee angle deviation", "Arm shoulder parallelity"],
-        weekly_goal: 150
+        current_pose: selectedPose?.name || null,
+        weekly_goal: user?.weekly_goal_minutes || 150
       };
 
       const res = await assistantService.sendMessage(text, context, messages);

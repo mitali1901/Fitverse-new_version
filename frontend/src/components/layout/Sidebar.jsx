@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutGrid, Flower2, MessageSquareCode, User } from 'lucide-react';
+import { LayoutGrid, Flower2, MessageSquareCode, Apple, User } from 'lucide-react';
 import FitVerseLogo from '../common/FitVerseLogo';
 
 export default function Sidebar() {
@@ -9,6 +9,7 @@ export default function Sidebar() {
   const navItems = [
     { to: "/", label: "Home", icon: LayoutGrid },
     { to: "/yoga-studio", label: "Yoga Studio", icon: Flower2 },
+    { to: "/diet", label: "Diet Planner", icon: Apple },
     { to: "/assistant", label: "AI Assistant", icon: MessageSquareCode },
     { to: "/profile", label: "Profile", icon: User },
   ];

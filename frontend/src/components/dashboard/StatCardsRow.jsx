@@ -1,45 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { Flower2, Dumbbell, Flame, TrendingUp, ArrowUp } from 'lucide-react';
+import React from 'react';
+import { Flower2, Dumbbell, Flame, TrendingUp, ArrowUp, ArrowDown } from 'lucide-react';
 
-const POSE_CALORIES = {
-  "warrior_ii": 50,
-  "tree_pose": 35,
-  "downward_dog": 45
-};
+function ChangeBadge({ value }) {
+  const text = value ?? "+0";
+  const isNegative = String(text).trim().startsWith("-");
+  const Icon = isNegative ? ArrowDown : ArrowUp;
+
+  return (
+    <span className={`inline-flex items-center text-[11px] font-bold px-1.5 py-0.5 rounded-full ${
+      isNegative
+        ? "text-fitverse-error bg-fitverse-error-light"
+        : "text-fitverse-green-success bg-fitverse-mint"
+    }`}>
+      <Icon className="w-2.5 h-2.5 mr-0.5" />
+      {text}
+    </span>
+  );
+}
 
 export default function StatCardsRow({ stats }) {
-  const [dailyCalories, setDailyCalories] = useState(0);
-  const [completedCount, setCompletedCount] = useState(0);
-  const [totalSessions, setTotalSessions] = useState(0);
-  const [totalMinutes, setTotalMinutes] = useState(0);
-
-  useEffect(() => {
-    // Read pose completion data
-    const dailyData = JSON.parse(localStorage.getItem('fitverse_daily_data') || '{}');
-    const today = new Date().toISOString().split('T')[0];
-    const todayData = dailyData[today] || {};
-    
-    setDailyCalories(todayData.calories || 0);
-    
-    const completedPoses = todayData.completedPoses || {};
-    setCompletedCount(Object.values(completedPoses).filter(Boolean).length);
-
-    // Read session data
-    const sessionData = JSON.parse(localStorage.getItem('fitverse_sessions') || '[]');
-    const todaySessions = sessionData.filter(s => s.date === today);
-    setTotalSessions(todaySessions.length);
-    
-    const minutes = todaySessions.reduce((sum, s) => sum + Math.floor(s.duration / 60), 0);
-    setTotalMinutes(minutes);
-  }, []);
-
-  const yogaCount = totalSessions > 0 ? totalSessions : (stats?.yoga_sessions?.value ?? 6);
-  const yogaChange = stats?.yoga_sessions?.change ?? "+2";
-  const activeMinutes = totalMinutes > 0 ? `${totalMinutes} min` : (stats?.active_minutes?.value ?? "90 min");
-  const minutesChange = stats?.active_minutes?.change ?? "+20 min";
-  const calories = dailyCalories > 0 ? `${dailyCalories} kcal` : (stats?.calories?.value ?? "420 kcal");
-  const caloriesChange = stats?.calories?.change ?? "+110 kcal";
-  const progressPct = stats?.overall_progress?.percentage ?? (completedCount > 0 ? Math.round((completedCount / 3) * 100) : 60);
+  const yogaCount = stats?.yoga_sessions?.value ?? 0;
+  const yogaChange = stats?.yoga_sessions?.change;
+  const activeMinutes = stats?.active_minutes?.value ?? "0 min";
+  const minutesChange = stats?.active_minutes?.change;
+  const calories = stats?.calories?.value ?? "0 kcal";
+  const caloriesChange = stats?.calories?.change;
+  const progressPct = Math.min(100, Math.max(0, stats?.overall_progress?.percentage ?? 0));
 
   // Circular gauge calculation (radius = 28, circumference = 2 * PI * 28 ≈ 175.9)
   const radius = 28;
@@ -59,10 +45,7 @@ export default function StatCardsRow({ stats }) {
             <h4 className="text-2xl font-black text-fitverse-dark tracking-tight">{yogaCount}</h4>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-[11px] text-fitverse-muted">This Week</span>
-              <span className="inline-flex items-center text-[11px] font-bold text-fitverse-green-success bg-fitverse-mint px-1.5 py-0.5 rounded-full">
-                <ArrowUp className="w-2.5 h-2.5 mr-0.5" />
-                {yogaChange}
-              </span>
+              <ChangeBadge value={yogaChange} />
             </div>
           </div>
         </div>
@@ -79,10 +62,7 @@ export default function StatCardsRow({ stats }) {
             <h4 className="text-2xl font-black text-fitverse-dark tracking-tight">{activeMinutes}</h4>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-[11px] text-fitverse-muted">This Week</span>
-              <span className="inline-flex items-center text-[11px] font-bold text-fitverse-green-success bg-fitverse-mint px-1.5 py-0.5 rounded-full">
-                <ArrowUp className="w-2.5 h-2.5 mr-0.5" />
-                {minutesChange}
-              </span>
+              <ChangeBadge value={minutesChange} />
             </div>
           </div>
         </div>
@@ -99,10 +79,7 @@ export default function StatCardsRow({ stats }) {
             <h4 className="text-2xl font-black text-fitverse-dark tracking-tight">{calories}</h4>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-[11px] text-fitverse-muted">This Week</span>
-              <span className="inline-flex items-center text-[11px] font-bold text-fitverse-green-success bg-fitverse-mint px-1.5 py-0.5 rounded-full">
-                <ArrowUp className="w-2.5 h-2.5 mr-0.5" />
-                {caloriesChange}
-              </span>
+              <ChangeBadge value={caloriesChange} />
             </div>
           </div>
         </div>
@@ -117,7 +94,7 @@ export default function StatCardsRow({ stats }) {
             </div>
             <p className="text-xs font-semibold text-fitverse-dark">Your Progress</p>
           </div>
-          <p className="text-[11px] text-fitverse-muted mt-2">Goal completion rate</p>
+          <p className="text-[11px] text-fitverse-muted mt-2">Weekly goal completion rate</p>
         </div>
 
         {/* Circular Progress Gauge */}
@@ -154,4 +131,3 @@ export default function StatCardsRow({ stats }) {
     </div>
   );
 }
-

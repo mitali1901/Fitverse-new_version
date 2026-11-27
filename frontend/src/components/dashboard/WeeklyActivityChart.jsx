@@ -2,18 +2,12 @@ import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { BarChart3 } from 'lucide-react';
 
-const DEFAULT_ACTIVITY_DATA = [
-  { day: "Mon", minutes: 25 },
-  { day: "Tue", minutes: 28 },
-  { day: "Wed", minutes: 32 },
-  { day: "Thu", minutes: 48 },
-  { day: "Fri", minutes: 30 },
-  { day: "Sat", minutes: 38 },
-  { day: "Sun", minutes: 44 },
-];
-
-export default function WeeklyActivityChart({ data = DEFAULT_ACTIVITY_DATA }) {
-  const chartData = data && data.length > 0 ? data : DEFAULT_ACTIVITY_DATA;
+export default function WeeklyActivityChart({ data = [] }) {
+  const chartData = data && data.length > 0 ? data : [];
+  const chartMax = Math.max(60, ...chartData.map((item) => item.minutes || 0));
+  const yTicks = chartMax <= 60
+    ? [0, 15, 30, 45, 60]
+    : [0, Math.round(chartMax / 3), Math.round((chartMax * 2) / 3), chartMax];
 
   return (
     <div className="bg-white rounded-3xl border border-[#F0E6F7] p-6 shadow-card flex flex-col justify-between h-full">
@@ -38,8 +32,8 @@ export default function WeeklyActivityChart({ data = DEFAULT_ACTIVITY_DATA }) {
             <YAxis
               axisLine={false}
               tickLine={false}
-              domain={[0, 60]}
-              ticks={[0, 15, 30, 45, 60]}
+              domain={[0, chartMax]}
+              ticks={yTicks}
               tickFormatter={(v) => `${v} min`}
               tick={{ fill: '#766D80', fontSize: 10 }}
             />

@@ -8,6 +8,7 @@ import DashboardLayout from './components/layout/DashboardLayout';
 import Dashboard from './pages/Dashboard';
 import YogaStudio from './pages/YogaStudio';
 import AIAssistant from './pages/AIAssistant';
+import DietPlanner from './pages/DietPlanner';
 import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -60,6 +61,8 @@ export default function App() {
               <Route path="studio" element={<YogaStudio />} />
               <Route path="yoga-studio" element={<YogaStudio />} />
               <Route path="assistant" element={<AIAssistant />} />
+              <Route path="diet" element={<DietPlanner />} />
+              <Route path="diet-planner" element={<DietPlanner />} />
               <Route path="profile" element={<Profile />} />
               <Route path="activity" element={<Dashboard />} />
               <Route path="activity-tracker" element={<Dashboard />} />

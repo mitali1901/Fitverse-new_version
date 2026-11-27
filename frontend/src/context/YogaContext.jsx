@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { yogaService } from '../services/yogaService';
 
 const YogaContext = createContext(null);
@@ -29,7 +29,7 @@ export function YogaProvider({ children }) {
     loadInitialData();
   }, []);
 
-  const refreshSummary = async () => {
+  const refreshSummary = useCallback(async () => {
     try {
       const summary = await yogaService.getSummary();
       setDashboardData(summary);
@@ -38,9 +38,9 @@ export function YogaProvider({ children }) {
       console.warn("Summary fetch error:", err);
       return null;
     }
-  };
+  }, []);
 
-  const recordSession = async (sessionData) => {
+  const recordSession = useCallback(async (sessionData) => {
     try {
       const res = await yogaService.createSession(sessionData);
       await refreshSummary();
@@ -49,7 +49,7 @@ export function YogaProvider({ children }) {
       console.error("Record session error:", err);
       throw err;
     }
-  };
+  }, [refreshSummary]);
 
   return (
     <YogaContext.Provider value={{

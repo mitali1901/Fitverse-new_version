@@ -41,13 +41,7 @@ export default function PoseSelectorModal({ isOpen, onClose, poses, selectedPose
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-xl bg-fitverse-lavender flex items-center justify-center overflow-hidden shrink-0 p-1">
                     <img
-                      src={
-                        pose.id === "tree_pose"
-                          ? "/assets/tree_pose.svg"
-                          : pose.id === "downward_dog"
-                          ? "/assets/downward_dog.svg"
-                          : "/assets/warrior_pose.svg"
-                      }
+                      src={pose.image || "/assets/warrior_pose.svg"}
                       alt={pose.name}
                       className="w-full h-full object-contain"
                     />

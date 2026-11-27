@@ -18,11 +18,13 @@ def create_app():
     from app.routes.user_routes import user_bp
     from app.routes.yoga_routes import yoga_bp
     from app.routes.assistant_routes import assistant_bp
+    from app.routes.diet_routes import diet_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(user_bp, url_prefix="/api/users")
     app.register_blueprint(yoga_bp, url_prefix="/api/yoga")
     app.register_blueprint(assistant_bp, url_prefix="/api/assistant")
+    app.register_blueprint(diet_bp, url_prefix="/api/diet")
 
     @app.route("/", methods=["GET"])
     def home():

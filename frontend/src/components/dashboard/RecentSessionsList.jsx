@@ -2,36 +2,9 @@ import React from 'react';
 import { Flower2, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const DEFAULT_RECENT = [
-  {
-    _id: "s1",
-    pose_name: "Tree Pose",
-    date: "Jan 20, 2025",
-    duration_formatted: "5 min",
-    score: 92,
-    icon: "🧘"
-  },
-  {
-    _id: "s2",
-    pose_name: "Warrior Pose",
-    date: "Jan 18, 2025",
-    duration_formatted: "6 min",
-    score: 85,
-    icon: "🤺"
-  },
-  {
-    _id: "s3",
-    pose_name: "Downward Dog",
-    date: "Jan 16, 2025",
-    duration_formatted: "5 min",
-    score: 88,
-    icon: "🐕"
-  }
-];
-
-export default function RecentSessionsList({ sessions = DEFAULT_RECENT }) {
+export default function RecentSessionsList({ sessions = [] }) {
   const navigate = useNavigate();
-  const displaySessions = (sessions && sessions.length > 0) ? sessions.slice(0, 3) : DEFAULT_RECENT;
+  const displaySessions = sessions.slice(0, 3);
 
   return (
     <div className="bg-white rounded-3xl border border-[#F0E6F7] p-6 shadow-card flex flex-col justify-between h-full">
@@ -54,34 +27,39 @@ export default function RecentSessionsList({ sessions = DEFAULT_RECENT }) {
 
       {/* Sessions Items */}
       <div className="space-y-3.5 flex-1 flex flex-col justify-center">
-        {displaySessions.map((session, index) => {
-          const score = session.score || 85;
-          return (
-            <div
-              key={session._id || index}
-              className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-[#FAF6FD] transition-colors border border-transparent hover:border-[#F2E8FA]"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-fitverse-lavender flex items-center justify-center text-lg shadow-xs">
-                  {session.icon || "🧘"}
+        {displaySessions.length === 0 ? (
+          <div className="text-center py-8 text-xs text-fitverse-muted">
+            No recent sessions yet. Complete a yoga session to see it here.
+          </div>
+        ) : (
+          displaySessions.map((session, index) => {
+            const score = session.score ?? 0;
+            return (
+              <div
+                key={session._id || index}
+                className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-[#FAF6FD] transition-colors border border-transparent hover:border-[#F2E8FA]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-fitverse-lavender flex items-center justify-center shrink-0">
+                    <Flower2 className="w-5 h-5 text-fitverse-purple" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-fitverse-dark">{session.pose_name}</h4>
+                    <p className="text-[11px] text-fitverse-muted">
+                      {session.date || "Recent"} · {session.duration_formatted || `${Math.round((session.duration || 0) / 60)} min`}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-xs font-bold text-fitverse-dark">{session.pose_name}</h4>
-                  <p className="text-[11px] text-fitverse-muted">
-                    {session.date || "Recent"} · {session.duration_formatted || `${Math.round((session.duration || 300) / 60)} min`}
-                  </p>
-                </div>
-              </div>
 
-              {/* Percentage Green Badge */}
-              <div className="px-2.5 py-1 rounded-full bg-fitverse-mint text-fitverse-green-success font-black text-xs">
-                {score}%
+                {/* Percentage Green Badge */}
+                <div className="px-2.5 py-1 rounded-full bg-fitverse-mint text-fitverse-green-success font-black text-xs">
+                  {score}%
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </div>
   );
 }
-

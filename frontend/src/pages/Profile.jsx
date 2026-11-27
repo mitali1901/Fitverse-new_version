@@ -41,9 +41,9 @@ export default function Profile() {
     }
   };
 
-  const totalSessions = dashboardData?.total_lifetime_sessions || 6;
-  const activeMinutes = dashboardData?.stats?.active_minutes?.value || "90 min";
-  const avgScore = dashboardData?.average_lifetime_score || 85.0;
+  const totalSessions = dashboardData?.total_lifetime_sessions ?? 0;
+  const activeMinutes = dashboardData?.stats?.active_minutes?.value ?? "0 min";
+  const avgScore = dashboardData?.average_lifetime_score ?? 0;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

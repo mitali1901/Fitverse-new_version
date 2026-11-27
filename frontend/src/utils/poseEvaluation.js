@@ -1,6 +1,6 @@
 /**
  * FitVerse Pose Evaluation Engine
- * Evaluates MediaPipe body landmarks for Tree Pose, Warrior II, and Downward-Facing Dog.
+ * Evaluates MediaPipe body landmarks for the supported yoga pose library.
  * Computes individual segment alignment (Green = Aligned, Red = Needs Correction).
  */
 
@@ -547,6 +547,558 @@ export function evaluateGenericPose(landmarks) {
   };
 }
 
+function poseNotDetected(statusText, instruction) {
+  return {
+    alignmentScore: 0,
+    statusText,
+    feedbackList: [{ id: "pose_check", text: instruction, passed: false, isWarning: true }],
+    segments: {},
+    criticalJoint: null
+  };
+}
+
+function finalizePoseEvaluation(feedbackList, segments, criticalJoint = null) {
+  const evaluatedRules = feedbackList.map((item) => Boolean(item.passed));
+  const passedCount = evaluatedRules.filter(Boolean).length;
+  const score = Math.round((passedCount / evaluatedRules.length) * 100);
+
+  return {
+    alignmentScore: score,
+    statusText: score >= 75 ? "Good Alignment" : (score >= 50 ? "Moderate Alignment" : "Needs Improvement"),
+    feedbackList,
+    segments,
+    criticalJoint
+  };
+}
+
+function getCoreLandmarks(landmarks) {
+  if (!landmarks || landmarks.length < 29) return null;
+
+  const ls = landmarks[LM.LEFT_SHOULDER];
+  const rs = landmarks[LM.RIGHT_SHOULDER];
+  const le = landmarks[LM.LEFT_ELBOW];
+  const re = landmarks[LM.RIGHT_ELBOW];
+  const lw = landmarks[LM.LEFT_WRIST];
+  const rw = landmarks[LM.RIGHT_WRIST];
+  const lh = landmarks[LM.LEFT_HIP];
+  const rh = landmarks[LM.RIGHT_HIP];
+  const lk = landmarks[LM.LEFT_KNEE];
+  const rk = landmarks[LM.RIGHT_KNEE];
+  const la = landmarks[LM.LEFT_ANKLE];
+  const ra = landmarks[LM.RIGHT_ANKLE];
+
+  if (!ls || !rs || !le || !re || !lw || !rw || !lh || !rh || !lk || !rk || !la || !ra) {
+    return null;
+  }
+
+  return {
+    ls, rs, le, re, lw, rw, lh, rh, lk, rk, la, ra,
+    midShoulder: midPoint(ls, rs),
+    midHip: midPoint(lh, rh),
+    midAnkle: midPoint(la, ra),
+    shoulderWidth: calculateDistance(ls, rs),
+    hipWidth: calculateDistance(lh, rh),
+    ankleWidth: calculateDistance(la, ra)
+  };
+}
+
+function isLevel(a, b, tolerance = 0.08) {
+  return a && b && Math.abs(a.y - b.y) <= tolerance;
+}
+
+function isSpineVertical(midShoulder, midHip, maxAngle = 30) {
+  const tilt = calculateVerticalAngle(midShoulder, midHip);
+  return tilt !== null && tilt <= maxAngle;
+}
+
+function areArmsOverhead(ls, rs, lw, rw) {
+  return lw.y < ls.y - 0.04 && rw.y < rs.y - 0.04 && calculateDistance(lw, rw) < 0.38;
+}
+
+function areWristsUnderShoulders(lw, rw, ls, rs, tolerance = 0.16) {
+  return Math.abs(lw.x - ls.x) <= tolerance && Math.abs(rw.x - rs.x) <= tolerance;
+}
+
+function areKneesUnderHips(lk, rk, lh, rh, tolerance = 0.16) {
+  return Math.abs(lk.x - lh.x) <= tolerance && Math.abs(rk.x - rh.x) <= tolerance;
+}
+
+/**
+ * Evaluates Mountain Pose (Tadasana)
+ */
+export function evaluateMountainPose(landmarks) {
+  const lmk = getCoreLandmarks(landmarks);
+  if (!lmk) {
+    return poseNotDetected("Not in Mountain Pose", "Please get into Mountain Pose: stand tall with feet grounded and spine long.");
+  }
+
+  const leftKneeAngle = calculateAngle(lmk.lh, lmk.lk, lmk.la);
+  const rightKneeAngle = calculateAngle(lmk.rh, lmk.rk, lmk.ra);
+  const kneesExtended = leftKneeAngle >= 150 && rightKneeAngle >= 150;
+  const spineUpright = isSpineVertical(lmk.midShoulder, lmk.midHip, 28);
+  const shouldersLevel = isLevel(lmk.ls, lmk.rs);
+  const hipsLevel = isLevel(lmk.lh, lmk.rh, 0.1);
+  const armsOverhead = areArmsOverhead(lmk.ls, lmk.rs, lmk.lw, lmk.rw);
+  const armsRelaxed = lmk.lw.y > lmk.ls.y + 0.03 && lmk.rw.y > lmk.rs.y + 0.03;
+  const armsPositioned = armsOverhead || armsRelaxed;
+
+  const kneesLoose = leftKneeAngle >= 135 && rightKneeAngle >= 135;
+  const spineLoose = calculateVerticalAngle(lmk.midShoulder, lmk.midHip) <= 40;
+  const symmetryLoose = isLevel(lmk.ls, lmk.rs, 0.15) && isLevel(lmk.lh, lmk.rh, 0.15);
+  if (!(kneesLoose && spineLoose && symmetryLoose && armsPositioned)) {
+    return poseNotDetected("Not in Mountain Pose", "Please get into Mountain Pose: stand tall with feet grounded and spine long.");
+  }
+
+  const feedbackList = [
+    {
+      id: "legs",
+      text: kneesExtended ? "Legs are long and grounded." : "Straighten your knees without locking them.",
+      passed: kneesExtended,
+      isWarning: !kneesExtended,
+      segmentKey: "legs"
+    },
+    {
+      id: "spine",
+      text: spineUpright ? "Spine is tall and neutral." : "Lengthen your spine and lift your chest.",
+      passed: spineUpright,
+      isWarning: !spineUpright,
+      segmentKey: "torso"
+    },
+    {
+      id: "symmetry",
+      text: shouldersLevel && hipsLevel ? "Shoulders and hips are level." : "Square your shoulders and hips.",
+      passed: shouldersLevel && hipsLevel,
+      isWarning: !(shouldersLevel && hipsLevel),
+      segmentKey: "torso"
+    },
+    {
+      id: "arms",
+      text: armsPositioned ? "Arms are overhead or relaxed beside the body." : "Reach your arms overhead or rest them softly beside you.",
+      passed: armsPositioned,
+      isWarning: !armsPositioned,
+      segmentKey: "arms"
+    }
+  ];
+
+  return finalizePoseEvaluation(feedbackList, {
+    torso: spineUpright && shouldersLevel && hipsLevel,
+    left_arm: armsPositioned,
+    right_arm: armsPositioned,
+    left_leg: kneesExtended,
+    right_leg: kneesExtended
+  }, !kneesExtended ? LM.LEFT_KNEE : null);
+}
+
+/**
+ * Evaluates Chair Pose (Utkatasana)
+ */
+export function evaluateChairPose(landmarks) {
+  const lmk = getCoreLandmarks(landmarks);
+  if (!lmk) {
+    return poseNotDetected("Not in Chair Pose", "Please get into Chair Pose: sit back into a controlled squat with chest lifted.");
+  }
+
+  const leftKneeAngle = calculateAngle(lmk.lh, lmk.lk, lmk.la);
+  const rightKneeAngle = calculateAngle(lmk.rh, lmk.rk, lmk.ra);
+  const kneesBent = leftKneeAngle >= 70 && leftKneeAngle <= 135 && rightKneeAngle >= 70 && rightKneeAngle <= 135;
+  const hipsLowered = lmk.midHip.y > lmk.midShoulder.y + 0.08;
+  const spineUpright = isSpineVertical(lmk.midShoulder, lmk.midHip, 35);
+  const shouldersLevel = isLevel(lmk.ls, lmk.rs);
+  const hipsLevel = isLevel(lmk.lh, lmk.rh, 0.12);
+  const armsOverhead = areArmsOverhead(lmk.ls, lmk.rs, lmk.lw, lmk.rw);
+  const handsAtChest = calculateDistance(lmk.lw, lmk.rw) < 0.24;
+  const armsForward = lmk.lw.y > lmk.ls.y && lmk.rw.y > lmk.rs.y && calculateDistance(lmk.lw, lmk.rw) > lmk.shoulderWidth * 0.8;
+  const armsPositioned = armsOverhead || handsAtChest || armsForward;
+
+  const kneesLoose = leftKneeAngle >= 60 && leftKneeAngle <= 140 && rightKneeAngle >= 60 && rightKneeAngle <= 140;
+  const hipsLoweredLoose = lmk.midHip.y > lmk.midShoulder.y;
+  const spineLoose = isSpineVertical(lmk.midShoulder, lmk.midHip, 45);
+  if (!(kneesLoose && hipsLoweredLoose && spineLoose && armsPositioned)) {
+    return poseNotDetected("Not in Chair Pose", "Please get into Chair Pose: sit back into a controlled squat with chest lifted.");
+  }
+
+  const feedbackList = [
+    {
+      id: "knees",
+      text: kneesBent ? "Knees are bent in a controlled squat." : "Bend your knees deeper while keeping control.",
+      passed: kneesBent,
+      isWarning: !kneesBent,
+      segmentKey: "legs"
+    },
+    {
+      id: "depth",
+      text: hipsLowered ? "Hips are lowered into the chair shape." : "Sit your hips back and down.",
+      passed: hipsLowered,
+      isWarning: !hipsLowered,
+      segmentKey: "torso"
+    },
+    {
+      id: "spine",
+      text: spineUpright && shouldersLevel && hipsLevel ? "Chest is lifted with a long spine." : "Lift your chest and keep your spine long.",
+      passed: spineUpright && shouldersLevel && hipsLevel,
+      isWarning: !(spineUpright && shouldersLevel && hipsLevel),
+      segmentKey: "torso"
+    },
+    {
+      id: "arms",
+      text: armsPositioned ? "Arms are reaching or held with intent." : "Reach your arms overhead, forward, or bring palms together.",
+      passed: armsPositioned,
+      isWarning: !armsPositioned,
+      segmentKey: "arms"
+    }
+  ];
+
+  return finalizePoseEvaluation(feedbackList, {
+    torso: spineUpright && shouldersLevel && hipsLevel,
+    left_arm: armsPositioned,
+    right_arm: armsPositioned,
+    left_leg: kneesBent,
+    right_leg: kneesBent
+  }, !kneesBent ? LM.LEFT_KNEE : null);
+}
+
+/**
+ * Evaluates Plank Pose (Phalakasana)
+ */
+export function evaluatePlankPose(landmarks) {
+  const lmk = getCoreLandmarks(landmarks);
+  if (!lmk) {
+    return poseNotDetected("Not in Plank Pose", "Please get into Plank Pose: extend from head to heels in one straight line.");
+  }
+
+  const leftElbowAngle = calculateAngle(lmk.ls, lmk.le, lmk.lw);
+  const rightElbowAngle = calculateAngle(lmk.rs, lmk.re, lmk.rw);
+  const leftKneeAngle = calculateAngle(lmk.lh, lmk.lk, lmk.la);
+  const rightKneeAngle = calculateAngle(lmk.rh, lmk.rk, lmk.ra);
+  const armsStraight = leftElbowAngle >= 140 && rightElbowAngle >= 140;
+  const legsStraight = leftKneeAngle >= 145 && rightKneeAngle >= 145;
+  const bodyHorizontal = isLevel(lmk.midShoulder, lmk.midHip, 0.18) && isLevel(lmk.midHip, lmk.midAnkle, 0.18);
+  const bodyLineAngle = calculateAngle(lmk.midShoulder, lmk.midHip, lmk.midAnkle);
+  const bodyInLine = bodyHorizontal || (bodyLineAngle !== null && bodyLineAngle >= 145);
+  const shouldersLevel = isLevel(lmk.ls, lmk.rs);
+  const hipsLevel = isLevel(lmk.lh, lmk.rh, 0.1);
+
+  const armsLoose = leftElbowAngle >= 110 && rightElbowAngle >= 110;
+  const legsLoose = leftKneeAngle >= 125 && rightKneeAngle >= 125;
+  const bodyLoose = isLevel(lmk.midShoulder, lmk.midAnkle, 0.35);
+  const stabilityLoose = isLevel(lmk.ls, lmk.rs, 0.15) && isLevel(lmk.lh, lmk.rh, 0.15);
+  if (!(armsLoose && legsLoose && bodyLoose && stabilityLoose)) {
+    return poseNotDetected("Not in Plank Pose", "Please get into Plank Pose: extend from head to heels in one straight line.");
+  }
+
+  const feedbackList = [
+    {
+      id: "arms",
+      text: armsStraight ? "Arms are pressing firmly into the floor." : "Straighten your arms and press through your hands.",
+      passed: armsStraight,
+      isWarning: !armsStraight,
+      segmentKey: "arms"
+    },
+    {
+      id: "legs",
+      text: legsStraight ? "Legs are extended and engaged." : "Extend your legs and press through your heels.",
+      passed: legsStraight,
+      isWarning: !legsStraight,
+      segmentKey: "legs"
+    },
+    {
+      id: "bodyline",
+      text: bodyInLine ? "Body forms one straight line." : "Keep your body in one straight line from head to heels.",
+      passed: bodyInLine,
+      isWarning: !bodyInLine,
+      segmentKey: "torso"
+    },
+    {
+      id: "stability",
+      text: shouldersLevel && hipsLevel ? "Shoulders and hips are stable." : "Square your shoulders and hips without shifting.",
+      passed: shouldersLevel && hipsLevel,
+      isWarning: !(shouldersLevel && hipsLevel),
+      segmentKey: "torso"
+    }
+  ];
+
+  return finalizePoseEvaluation(feedbackList, {
+    torso: bodyInLine && shouldersLevel && hipsLevel,
+    left_arm: armsStraight,
+    right_arm: armsStraight,
+    left_leg: legsStraight,
+    right_leg: legsStraight
+  }, !bodyInLine ? LM.LEFT_HIP : null);
+}
+
+/**
+ * Evaluates Cobra Pose (Bhujangasana)
+ */
+export function evaluateCobraPose(landmarks) {
+  const lmk = getCoreLandmarks(landmarks);
+  if (!lmk) {
+    return poseNotDetected("Not in Cobra Pose", "Please get into Cobra Pose: lie face down and gently lift your chest.");
+  }
+
+  const leftElbowAngle = calculateAngle(lmk.ls, lmk.le, lmk.lw);
+  const rightElbowAngle = calculateAngle(lmk.rs, lmk.re, lmk.rw);
+  const leftKneeAngle = calculateAngle(lmk.lh, lmk.lk, lmk.la);
+  const rightKneeAngle = calculateAngle(lmk.rh, lmk.rk, lmk.ra);
+  const elbowsSupported = leftElbowAngle >= 70 && rightElbowAngle >= 70;
+  const chestLifted = lmk.midShoulder.y < lmk.midHip.y;
+  const shouldersLevel = isLevel(lmk.ls, lmk.rs);
+  const hipsLevel = isLevel(lmk.lh, lmk.rh, 0.12);
+  const handsUnderShoulders = areWristsUnderShoulders(lmk.lw, lmk.rw, lmk.ls, lmk.rs, 0.22);
+  const legsExtended = leftKneeAngle >= 140 && rightKneeAngle >= 140;
+
+  const elbowsLoose = leftElbowAngle >= 50 && leftElbowAngle <= 170 && rightElbowAngle >= 50 && rightElbowAngle <= 170;
+  const chestLoose = lmk.midShoulder.y <= lmk.midHip.y + 0.03;
+  const handsLoose = areWristsUnderShoulders(lmk.lw, lmk.rw, lmk.ls, lmk.rs, 0.28);
+  const legsLoose = leftKneeAngle >= 120 && rightKneeAngle >= 120;
+  if (!(elbowsLoose && chestLoose && handsLoose && legsLoose)) {
+    return poseNotDetected("Not in Cobra Pose", "Please get into Cobra Pose: lie face down and gently lift your chest.");
+  }
+
+  const feedbackList = [
+    {
+      id: "elbows",
+      text: elbowsSupported ? "Elbows are softly bent for support." : "Soften your elbows and avoid locking them.",
+      passed: elbowsSupported,
+      isWarning: !elbowsSupported,
+      segmentKey: "arms"
+    },
+    {
+      id: "chest",
+      text: chestLifted ? "Chest is lifted into a gentle backbend." : "Lift your chest while keeping your hips grounded.",
+      passed: chestLifted,
+      isWarning: !chestLifted,
+      segmentKey: "torso"
+    },
+    {
+      id: "alignment",
+      text: shouldersLevel && hipsLevel ? "Shoulders and hips are level." : "Keep your shoulders and hips level.",
+      passed: shouldersLevel && hipsLevel,
+      isWarning: !(shouldersLevel && hipsLevel),
+      segmentKey: "torso"
+    },
+    {
+      id: "hands",
+      text: handsUnderShoulders ? "Hands are positioned under the shoulders." : "Place your hands under your shoulders.",
+      passed: handsUnderShoulders,
+      isWarning: !handsUnderShoulders,
+      segmentKey: "arms"
+    },
+    {
+      id: "legs",
+      text: legsExtended ? "Legs are extended behind you." : "Extend your legs and keep the tops of your feet grounded.",
+      passed: legsExtended,
+      isWarning: !legsExtended,
+      segmentKey: "legs"
+    }
+  ];
+
+  return finalizePoseEvaluation(feedbackList, {
+    torso: chestLifted && shouldersLevel && hipsLevel,
+    left_arm: elbowsSupported,
+    right_arm: elbowsSupported,
+    left_leg: legsExtended,
+    right_leg: legsExtended
+  }, !chestLifted ? LM.LEFT_HIP : null);
+}
+
+/**
+ * Evaluates Bridge Pose (Setu Bandhasana)
+ */
+export function evaluateBridgePose(landmarks) {
+  const lmk = getCoreLandmarks(landmarks);
+  if (!lmk) {
+    return poseNotDetected("Not in Bridge Pose", "Please get into Bridge Pose: lie on your back, bend your knees, and lift your hips.");
+  }
+
+  const leftKneeAngle = calculateAngle(lmk.lh, lmk.lk, lmk.la);
+  const rightKneeAngle = calculateAngle(lmk.rh, lmk.rk, lmk.ra);
+  const kneesBent = leftKneeAngle >= 70 && leftKneeAngle <= 135 && rightKneeAngle >= 70 && rightKneeAngle <= 135;
+  const feetUnderKnees = Math.abs(lmk.la.x - lmk.lk.x) <= 0.2 && Math.abs(lmk.ra.x - lmk.rk.x) <= 0.2;
+  const feetLevel = isLevel(lmk.la, lmk.ra, 0.12);
+  const hipsLevel = isLevel(lmk.lh, lmk.rh, 0.12);
+  const shouldersLevel = isLevel(lmk.ls, lmk.rs);
+
+  const kneesLoose = leftKneeAngle >= 60 && leftKneeAngle <= 140 && rightKneeAngle >= 60 && rightKneeAngle <= 140;
+  const feetLoose = Math.abs(lmk.la.x - lmk.lk.x) <= 0.25 && Math.abs(lmk.ra.x - lmk.rk.x) <= 0.25;
+  const levelLoose = isLevel(lmk.la, lmk.ra, 0.18) && isLevel(lmk.lh, lmk.rh, 0.18) && isLevel(lmk.ls, lmk.rs, 0.15);
+  if (!(kneesLoose && feetLoose && levelLoose)) {
+    return poseNotDetected("Not in Bridge Pose", "Please get into Bridge Pose: lie on your back, bend your knees, and lift your hips.");
+  }
+
+  const feedbackList = [
+    {
+      id: "knees",
+      text: kneesBent ? "Knees are bent with feet grounded." : "Bend your knees and keep your feet flat on the floor.",
+      passed: kneesBent,
+      isWarning: !kneesBent,
+      segmentKey: "legs"
+    },
+    {
+      id: "feet",
+      text: feetUnderKnees && feetLevel ? "Feet are under the knees and level." : "Place your feet under your knees and keep them level.",
+      passed: feetUnderKnees && feetLevel,
+      isWarning: !(feetUnderKnees && feetLevel),
+      segmentKey: "legs"
+    },
+    {
+      id: "hips",
+      text: hipsLevel ? "Hips are lifted evenly." : "Lift your hips evenly without shifting to one side.",
+      passed: hipsLevel,
+      isWarning: !hipsLevel,
+      segmentKey: "torso"
+    },
+    {
+      id: "shoulders",
+      text: shouldersLevel ? "Shoulders remain grounded and level." : "Keep your shoulders relaxed and level on the floor.",
+      passed: shouldersLevel,
+      isWarning: !shouldersLevel,
+      segmentKey: "torso"
+    }
+  ];
+
+  return finalizePoseEvaluation(feedbackList, {
+    torso: hipsLevel && shouldersLevel,
+    left_leg: kneesBent,
+    right_leg: kneesBent
+  }, !kneesBent ? LM.LEFT_KNEE : null);
+}
+
+/**
+ * Evaluates Seated Forward Bend (Paschimottanasana)
+ */
+export function evaluateSeatedForwardBend(landmarks) {
+  const lmk = getCoreLandmarks(landmarks);
+  if (!lmk) {
+    return poseNotDetected("Not in Seated Forward Bend", "Please get into Seated Forward Bend: sit tall and hinge forward from the hips.");
+  }
+
+  const leftKneeAngle = calculateAngle(lmk.lh, lmk.lk, lmk.la);
+  const rightKneeAngle = calculateAngle(lmk.rh, lmk.rk, lmk.ra);
+  const legsExtended = leftKneeAngle >= 120 && rightKneeAngle >= 120;
+  const torsoAngle = calculateVerticalAngle(lmk.midShoulder, lmk.midHip);
+  const torsoFolded = torsoAngle !== null && torsoAngle >= 18 && torsoAngle <= 85;
+  const shouldersLevel = isLevel(lmk.ls, lmk.rs);
+  const hipsLevel = isLevel(lmk.lh, lmk.rh, 0.12);
+  const leftElbowAngle = calculateAngle(lmk.ls, lmk.le, lmk.lw);
+  const rightElbowAngle = calculateAngle(lmk.rs, lmk.re, lmk.rw);
+  const armsReaching = leftElbowAngle >= 120 && rightElbowAngle >= 120;
+
+  const legsLoose = leftKneeAngle >= 110 && rightKneeAngle >= 110;
+  const foldLoose = torsoAngle !== null && torsoAngle >= 15 && torsoAngle <= 90;
+  const armsLoose = leftElbowAngle >= 110 && rightElbowAngle >= 110;
+  const symmetryLoose = isLevel(lmk.ls, lmk.rs, 0.15) && isLevel(lmk.lh, lmk.rh, 0.18);
+  if (!(legsLoose && foldLoose && armsLoose && symmetryLoose)) {
+    return poseNotDetected("Not in Seated Forward Bend", "Please get into Seated Forward Bend: sit tall and hinge forward from the hips.");
+  }
+
+  const feedbackList = [
+    {
+      id: "legs",
+      text: legsExtended ? "Legs are extended or softly bent." : "Extend your legs or keep a soft bend in the knees.",
+      passed: legsExtended,
+      isWarning: !legsExtended,
+      segmentKey: "legs"
+    },
+    {
+      id: "fold",
+      text: torsoFolded ? "Fold is hinging from the hips." : "Hinge forward from your hips while keeping the spine long.",
+      passed: torsoFolded,
+      isWarning: !torsoFolded,
+      segmentKey: "torso"
+    },
+    {
+      id: "alignment",
+      text: shouldersLevel && hipsLevel ? "Hips and shoulders are aligned." : "Square your hips and keep your shoulders relaxed.",
+      passed: shouldersLevel && hipsLevel,
+      isWarning: !(shouldersLevel && hipsLevel),
+      segmentKey: "torso"
+    },
+    {
+      id: "arms",
+      text: armsReaching ? "Arms are reaching toward the feet." : "Reach your arms forward toward your feet.",
+      passed: armsReaching,
+      isWarning: !armsReaching,
+      segmentKey: "arms"
+    }
+  ];
+
+  return finalizePoseEvaluation(feedbackList, {
+    torso: torsoFolded && shouldersLevel && hipsLevel,
+    left_arm: armsReaching,
+    right_arm: armsReaching,
+    left_leg: legsExtended,
+    right_leg: legsExtended
+  }, !torsoFolded ? LM.LEFT_HIP : null);
+}
+
+/**
+ * Evaluates Cat-Cow Pose (Marjaryasana-Bitilasana)
+ */
+export function evaluateCatCowPose(landmarks) {
+  const lmk = getCoreLandmarks(landmarks);
+  if (!lmk) {
+    return poseNotDetected("Not in Cat-Cow Pose", "Please get into Cat-Cow Pose: start on hands and knees with wrists under shoulders and knees under hips.");
+  }
+
+  const leftElbowAngle = calculateAngle(lmk.ls, lmk.le, lmk.lw);
+  const rightElbowAngle = calculateAngle(lmk.rs, lmk.re, lmk.rw);
+  const leftKneeAngle = calculateAngle(lmk.lh, lmk.lk, lmk.la);
+  const rightKneeAngle = calculateAngle(lmk.rh, lmk.rk, lmk.ra);
+  const elbowsBent = leftElbowAngle >= 50 && leftElbowAngle <= 160 && rightElbowAngle >= 50 && rightElbowAngle <= 160;
+  const kneesBent = leftKneeAngle >= 50 && leftKneeAngle <= 160 && rightKneeAngle >= 50 && rightKneeAngle <= 160;
+  const wristsUnderShoulders = areWristsUnderShoulders(lmk.lw, lmk.rw, lmk.ls, lmk.rs);
+  const kneesUnderHips = areKneesUnderHips(lmk.lk, lmk.rk, lmk.lh, lmk.rh);
+  const torsoStable = isLevel(lmk.midShoulder, lmk.midHip, 0.18);
+
+  const wristsLoose = areWristsUnderShoulders(lmk.lw, lmk.rw, lmk.ls, lmk.rs, 0.22);
+  const kneesLoose = areKneesUnderHips(lmk.lk, lmk.rk, lmk.lh, lmk.rh, 0.22);
+  const jointsLoose = leftElbowAngle >= 40 && leftElbowAngle <= 170 && rightElbowAngle >= 40 && rightElbowAngle <= 170 &&
+                      leftKneeAngle >= 40 && leftKneeAngle <= 170 && rightKneeAngle >= 40 && rightKneeAngle <= 170;
+  const torsoLoose = isLevel(lmk.midShoulder, lmk.midHip, 0.25);
+  if (!(wristsLoose && kneesLoose && jointsLoose && torsoLoose)) {
+    return poseNotDetected("Not in Cat-Cow Pose", "Please get into Cat-Cow Pose: start on hands and knees with wrists under shoulders and knees under hips.");
+  }
+
+  const feedbackList = [
+    {
+      id: "wrists",
+      text: wristsUnderShoulders ? "Wrists are under the shoulders." : "Place your wrists directly under your shoulders.",
+      passed: wristsUnderShoulders,
+      isWarning: !wristsUnderShoulders,
+      segmentKey: "arms"
+    },
+    {
+      id: "knees",
+      text: kneesUnderHips ? "Knees are under the hips." : "Place your knees directly under your hips.",
+      passed: kneesUnderHips,
+      isWarning: !kneesUnderHips,
+      segmentKey: "legs"
+    },
+    {
+      id: "joints",
+      text: elbowsBent && kneesBent ? "Elbows and knees are softly bent." : "Soften your elbows and keep your knees bent under your hips.",
+      passed: elbowsBent && kneesBent,
+      isWarning: !(elbowsBent && kneesBent),
+      segmentKey: "torso"
+    },
+    {
+      id: "torso",
+      text: torsoStable ? "Torso is stable and mobile." : "Keep your torso stable while moving through the flow.",
+      passed: torsoStable,
+      isWarning: !torsoStable,
+      segmentKey: "torso"
+    }
+  ];
+
+  return finalizePoseEvaluation(feedbackList, {
+    torso: torsoStable,
+    left_arm: elbowsBent,
+    right_arm: elbowsBent,
+    left_leg: kneesBent,
+    right_leg: kneesBent
+  }, !wristsUnderShoulders ? LM.LEFT_WRIST : (!kneesUnderHips ? LM.LEFT_KNEE : null));
+}
+
 /**
  * Universal Pose Evaluator router
  */
@@ -562,13 +1114,20 @@ export function evaluatePose(poseId, landmarks) {
   }
 
   const id = (poseId || "warrior_ii").toLowerCase();
-  if (id.includes("tree")) {
-    return evaluateTreePose(landmarks);
-  } else if (id.includes("downward") || id.includes("dog")) {
-    return evaluateDownwardDog(landmarks);
-  } else {
-    // Default to Warrior II
-    return evaluateWarriorII(landmarks);
-  }
+  const poseEvaluators = {
+    warrior_ii: evaluateWarriorII,
+    tree_pose: evaluateTreePose,
+    downward_dog: evaluateDownwardDog,
+    mountain_pose: evaluateMountainPose,
+    chair_pose: evaluateChairPose,
+    plank_pose: evaluatePlankPose,
+    cobra_pose: evaluateCobraPose,
+    bridge_pose: evaluateBridgePose,
+    seated_forward_bend: evaluateSeatedForwardBend,
+    cat_cow_pose: evaluateCatCowPose
+  };
+
+  const evaluator = poseEvaluators[id] || (id.includes("warrior") ? evaluateWarriorII : evaluateGenericPose);
+  return evaluator(landmarks);
 }
 

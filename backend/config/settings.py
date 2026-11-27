@@ -6,7 +6,8 @@ load_dotenv()
 
 class Config:
     SECRET_KEY = os.getenv("JWT_SECRET_KEY", "fitverse_default_jwt_secret_change_me_in_prod")
-    MONGO_URI = os.getenv("MONGO_URI", "")
+    MONGODB_URI = os.getenv("MONGODB_URI", "") or os.getenv("MONGO_URI", "")
+    MONGO_URI = MONGODB_URI
     DB_NAME = os.getenv("DB_NAME", "fitverse")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     FLASK_ENV = os.getenv("FLASK_ENV", "development")
